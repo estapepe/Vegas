@@ -82,7 +82,7 @@ class Player:
     def alpha(self):
         # Group the dice by top face.
         dice_sets = []
-        for i in range(1, 6):
+        for i in range(1, 7):
             current_set = []
             for die in self.dice:
                 if die.top_face == i:
@@ -126,7 +126,34 @@ class Casino:
     def __init__(self, call_sign: int, prizes: list):
         self.call_sign = call_sign
         self.dice = []
+        prizes.sort(reverse=True)
         self.prizes = prizes
+
+    def get_prizes(self):
+        # Group the dice by color.
+        dice_sets = []
+        for color in Game.DICE_COLORS:
+            current_set = []
+            for die in self.dice:
+                if die.color == color:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+        dice_sets.sort(key=len, reverse=True)
+        prizes = []
+        for dice_set in dice_sets:
+            if self.prizes:
+                prize = [self.prizes.pop(), dice_set]
+                prizes.append(prize)
+        print("Prized sets: ")
+        print(prizes)
+        return prizes
+
+    def __repr__(self):
+        call_sign = "Casino " + str(self.call_sign) + ":\n"
+        prizes = str(self.prizes) + "\n"
+        dice = str(self.dice)
+        return  call_sign + prizes + str(self.dice)
 
 
 class Game:
@@ -178,8 +205,9 @@ class Game:
     @staticmethod
     def initialize_dice_set(color):
         dice = []
+        faces = range(1, 7)
         for i in range(8):
-            dice.append(Die(range(1, 6), color))
+            dice.append(Die(faces, color))
         return dice
 
     def play(self):
@@ -194,13 +222,18 @@ class Game:
         if player.dice:
             dice = player.relinquish_dice(self.casinos)
             for die in dice:
-                self.casinos[die.top_face].dice.append(die)
+                self.casinos[die.top_face-1].dice.append(die)
 
     def is_all_players_dice_depleted(self) -> bool:
         dice_counts = []
         for player in self.players:
             dice_counts.append(len(player.dice))
         return sum(dice_counts) == 0
+
+    def award_banknotes(self):
+        for casino in self.casinos:
+            print(casino)
+            casino.get_prizes()
 
 
 class Die:
