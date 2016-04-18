@@ -15,7 +15,8 @@ class ExperimentSet:
 
 
 class Experiment:
-    ALPHA = 1
+    ALPHA = "alpha"
+    BETA = "beta"
 
     def __init__(self, replicate_cardinality, configuration):
         self.replicate_cardinality = replicate_cardinality
@@ -26,14 +27,14 @@ class Experiment:
             current_game = self.initialize_game()
             current_game.play()
 
-    def initialize_game(self) -> Game:
+    def initialize_game(self):
+        # The ALPHA experiment: 5 players, a different heuristic for each.
         if self.configuration == self.ALPHA:
-            alpha = Player(Player.ALPHA, 5)
-            bravo = Player(Player.BRAVO, 4)
-            charlie = Player(Player.CHARLIE, 3)
-            delta = Player(Player.DELTA, 2)
-            echo = Player(Player.ECHO, 1)
-            players = [alpha, bravo, charlie, delta, echo]
+            players = [Player.ALPHA, Player.BRAVO, Player.CHARLIE, Player.DELTA, Player.DELTA]
+            game = Game(players)
+        # The BETA experiment: 5 players, all using the ALPHA heuristic.
+        elif self.configuration == self.BETA:
+            players = [Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA]
             game = Game(players)
         else:
             raise UnknownConfigurationException()
@@ -47,25 +48,100 @@ class Player:
     DELTA = "delta"
     ECHO = "echo"
 
-    def __init__(self, call_sign, age):
+    def __init__(self, call_sign, age, dice: list):
         self.call_sign = call_sign
         self.age = age
+        self.dice = dice
+
+    def roll_dice(self):
+        for die in self.dice:
+            die.roll()
+
+    def relinquish_dice(self, casinos):
+        # Player has no dice.
+        if not self.dice:
+            return {}
+
+        # The ALPHA heuristic: Choose to bet the maximum amount of dice (the biggest dice set).
+        if self.call_sign == self.ALPHA:
+            return self.alpha()
+        # The BRAVO heuristic: Choose to bet to the casino with the highest prize.
+        elif self.call_sign == self.BRAVO:
+            return {}
+        # The CHARLIE heuristic: Choose to bet to the casino with the most prizes.
+        elif self.call_sign == self.CHARLIE:
+            return {}
+        # The DELTA heuristic: Choose to outnumber an opponent. Which opponent? In which casino?
+        elif self.call_sign == self.DELTA:
+            return {}
+        # The ECHO heuristic: Choose to tie an opponent. Which opponent? In which casino?
+        else:
+            # Random: Return a random set of dice.
+            return {}
+
+    def alpha(self):
+        # Group the dice by top face.
+        dice_sets = []
+        for i in range(1, 6):
+            current_set = []
+            for die in self.dice:
+                if die.top_face == i:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+        print("Dice sets: ")
+        print(dice_sets)
+
+        # Get the size of the biggest group, there might be two or more groups with the same size.
+        biggest_die_set_cardinality = 0
+        for dice_set in dice_sets:
+            if biggest_die_set_cardinality < len(dice_set):
+                biggest_die_set_cardinality = len(dice_set)
+        print("biggest_die_set_cardinality: " + str(biggest_die_set_cardinality))
+
+        # Keep only the biggest group (or groups).
+        choices = []
+        for dice_set in dice_sets:
+            if len(dice_set) == biggest_die_set_cardinality:
+                choices.append(dice_set)
+        print("Choices: ")
+        print(choices)
+
+        # From the biggest groups, choose at random.
+        choice = choices[random.randint(0, len(choices)-1)]
+        print("Player chose:")
+        print(choice)
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
+        print("Player was left with: ")
+        print(self.dice)
+        print("------------------------------------------------")
+        return choice
 
 
 class Casino:
-    def __init__(self, call_sign):
+    def __init__(self, call_sign: int, prizes: list):
         self.call_sign = call_sign
         self.dice = []
+        self.prizes = prizes
 
 
 class Game:
-    def __init__(self, players: list[Player]):
-        self.players = players
-        self.players.sort(key=lambda player: player.age)
-        self.banknotes = self.initialize_banknotes()
-        self.casinos = self.initialize_casinos()
+    DICE_COLORS = ["blue", "white", "black", "red", "green"]
 
-    def initialize_banknotes(self) -> list:
+    def __init__(self, call_signs: list):
+        self.player_colors = {}
+        self.players = []
+        self.initialize_players(call_signs)
+        self.banknotes = []
+        self.initialize_banknotes()
+        self.casinos = []
+        self.initialize_casinos()
+
+    def initialize_banknotes(self):
         self.banknotes = []
         for i in range(5):
             self.banknotes.append(60000)
@@ -81,19 +157,63 @@ class Game:
             self.banknotes.append(30000)
         random.shuffle(self.banknotes)
 
-    def initialize_casinos(self) -> list:
+    def initialize_casinos(self):
+        self.casinos = []
+        for i in range(6):
+            prizes = []
+            while sum(prizes) <= 50000:
+                prizes.append(self.banknotes.pop())
+            self.casinos.append(Casino(i+1, prizes))
 
+    def initialize_players(self, call_signs):
+        self.players = []
+        i = 1
+        for call_sign in call_signs:
+            color = self.DICE_COLORS[i-1]
+            self.players.append(Player(call_sign, i, self.initialize_dice_set(color)))
+            self.player_colors[call_sign] = self.DICE_COLORS[i-1]
+            i += 1
+        self.players.sort(key=lambda player: player.age)
+
+    @staticmethod
+    def initialize_dice_set(color):
+        dice = []
+        for i in range(8):
+            dice.append(Die(range(1, 6), color))
+        return dice
 
     def play(self):
+        while not self.is_all_players_dice_depleted():
+            for player in self.players:
+                player.roll_dice()
+                self.place_dice(player)
+        self.award_banknotes()
+        self.declare_winner()
+
+    def place_dice(self, player: Player):
+        if player.dice:
+            dice = player.relinquish_dice(self.casinos)
+            for die in dice:
+                self.casinos[die.top_face].dice.append(die)
+
+    def is_all_players_dice_depleted(self) -> bool:
+        dice_counts = []
         for player in self.players:
-            self.roll_dice(player)
-            self.place_dice(player)
+            dice_counts.append(len(player.dice))
+        return sum(dice_counts) == 0
 
 
 class Die:
-    def __init__(self, cardinality, color):
+    def __init__(self, faces, color):
         self.color = color
-        self.upper_surface = random.randint(1, cardinality)
+        self.faces = faces
+        self.top_face = random.choice(self.faces)
+
+    def roll(self):
+        self.top_face = random.choice(self.faces)
+
+    def __repr__(self):
+        return self.color + ":" + str(self.top_face)
 
 
 class UnknownConfigurationException(Exception):
