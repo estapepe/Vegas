@@ -188,7 +188,7 @@ class Game:
         self.casinos = []
         for i in range(6):
             prizes = []
-            while sum(prizes) <= 50000:
+            while sum(prizes) < 50000:
                 prizes.append(self.banknotes.pop())
             self.casinos.append(Casino(i+1, prizes))
 
