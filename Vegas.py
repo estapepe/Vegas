@@ -1,17 +1,59 @@
 import random
+import uuid
+from typing import List
+from typing import Set
 
 
-class ExperimentSet:
+class Casino:
+    def __init__(self, call_sign: int, prizes: list):
+        self.call_sign = call_sign
+        self.dice = []
+        prizes.sort(reverse=True)
+        self.prizes = prizes
 
-    def __init__(self, experiments):
-        """
-        @type self: list[Experiment]
-        """
-        self.experiments = experiments
+    def get_prizes(self):
+        # Group the dice by color.
+        dice_sets = []
+        for color in Game.DICE_COLORS:
+            current_set = []
+            for die in self.dice:
+                if die.color == color:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+        dice_sets.sort(key=len, reverse=True)
+        prizes = []
+        for dice_set in dice_sets:
+            if self.prizes:
+                prize = Prize(dice_set, self.prizes.pop())
+                prizes.append(prize)
+        return prizes
 
-    def execute(self):
-        for experiment in self.experiments:
-            experiment.execute()
+    def __repr__(self):
+        call_sign = "Casino " + str(self.call_sign) + ":\n"
+        prizes = str(self.prizes) + "\n"
+        dice = str(self.dice)
+        return call_sign + prizes + dice
+
+
+class Die:
+    def __init__(self, faces, color):
+        self.color = color
+        self.faces = faces
+        self.top_face = random.choice(self.faces)
+        self.owner_id = None
+
+    def __repr__(self):
+        return self.color + ":" + str(self.top_face)
+
+    def get_owner_id(self):
+        return self.owner_id
+
+    def roll(self):
+        self.top_face = random.choice(self.faces)
+
+    def set_owner(self, owner_id):
+        self.owner_id = owner_id
 
 
 class Experiment:
@@ -41,6 +83,26 @@ class Experiment:
         return game
 
 
+class ExperimentSet:
+
+    def __init__(self, experiments: List[Experiment]):
+        self.experiments = experiments
+
+    def execute(self):
+        for experiment in self.experiments:
+            experiment.execute()
+
+
+class Prize:
+    def __init__(self, dice: List[Die], banknote):
+        self.dice = dice
+        self.banknote = banknote
+
+    def get_dice_owner(self):
+        if self.dice:
+            return self.dice[0].get_owner_id()
+
+
 class Player:
     ALPHA = "alpha"
     BRAVO = "bravo"
@@ -48,10 +110,58 @@ class Player:
     DELTA = "delta"
     ECHO = "echo"
 
-    def __init__(self, call_sign, age, dice: list):
+    def __init__(self, call_sign, age, dice: List[Die]):
         self.call_sign = call_sign
         self.age = age
+        self.id = uuid.uuid1()
+        for die in dice:
+            die.set_owner(self.id)
         self.dice = dice
+        self.prize = None
+
+    def __repr__(self):
+        return self.call_sign + " " + str(self.get_id()) + " " + str(self.get_prize_amount())
+
+    def alpha(self):
+        # Group the dice by top face.
+        dice_sets = []
+        for i in range(1, 7):
+            current_set = []
+            for die in self.dice:
+                if die.top_face == i:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+
+        # Get the size of the biggest group, there might be two or more groups with the same size.
+        biggest_die_set_cardinality = 0
+        for dice_set in dice_sets:
+            if biggest_die_set_cardinality < len(dice_set):
+                biggest_die_set_cardinality = len(dice_set)
+
+        # Keep only the biggest group (or groups).
+        choices = []
+        for dice_set in dice_sets:
+            if len(dice_set) == biggest_die_set_cardinality:
+                choices.append(dice_set)
+
+        # From the biggest groups, choose at random.
+        choice = choices[random.randint(0, len(choices)-1)]
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
+        return choice
+
+    def get_id(self):
+        return self.id
+
+    def get_prize_amount(self):
+        amount = 0
+        if self.prize:
+            amount = self.prize.banknote
+        return amount
 
     def roll_dice(self):
         for die in self.dice:
@@ -79,94 +189,41 @@ class Player:
             # Random: Return a random set of dice.
             return {}
 
-    def alpha(self):
-        # Group the dice by top face.
-        dice_sets = []
-        for i in range(1, 7):
-            current_set = []
-            for die in self.dice:
-                if die.top_face == i:
-                    current_set.append(die)
-            if current_set:
-                dice_sets.append(current_set)
-        print("Dice sets: ")
-        print(dice_sets)
-
-        # Get the size of the biggest group, there might be two or more groups with the same size.
-        biggest_die_set_cardinality = 0
-        for dice_set in dice_sets:
-            if biggest_die_set_cardinality < len(dice_set):
-                biggest_die_set_cardinality = len(dice_set)
-        print("biggest_die_set_cardinality: " + str(biggest_die_set_cardinality))
-
-        # Keep only the biggest group (or groups).
-        choices = []
-        for dice_set in dice_sets:
-            if len(dice_set) == biggest_die_set_cardinality:
-                choices.append(dice_set)
-        print("Choices: ")
-        print(choices)
-
-        # From the biggest groups, choose at random.
-        choice = choices[random.randint(0, len(choices)-1)]
-        print("Player chose:")
-        print(choice)
-
-        # Give up the chosen dice.
-        for die in choice:
-            self.dice.remove(die)
-
-        print("Player was left with: ")
-        print(self.dice)
-        print("------------------------------------------------")
-        return choice
-
-
-class Casino:
-    def __init__(self, call_sign: int, prizes: list):
-        self.call_sign = call_sign
-        self.dice = []
-        prizes.sort(reverse=True)
-        self.prizes = prizes
-
-    def get_prizes(self):
-        # Group the dice by color.
-        dice_sets = []
-        for color in Game.DICE_COLORS:
-            current_set = []
-            for die in self.dice:
-                if die.color == color:
-                    current_set.append(die)
-            if current_set:
-                dice_sets.append(current_set)
-        dice_sets.sort(key=len, reverse=True)
-        prizes = []
-        for dice_set in dice_sets:
-            if self.prizes:
-                prize = [self.prizes.pop(), dice_set]
-                prizes.append(prize)
-        print("Prized sets: ")
-        print(prizes)
-        return prizes
-
-    def __repr__(self):
-        call_sign = "Casino " + str(self.call_sign) + ":\n"
-        prizes = str(self.prizes) + "\n"
-        dice = str(self.dice)
-        return  call_sign + prizes + str(self.dice)
+    def set_prize(self, prize: Prize):
+        self.prize = prize
 
 
 class Game:
     DICE_COLORS = ["blue", "white", "black", "red", "green"]
 
     def __init__(self, call_signs: list):
-        self.player_colors = {}
-        self.players = []
+        self.players = set([])  # type: Set[Player]
         self.initialize_players(call_signs)
         self.banknotes = []
         self.initialize_banknotes()
         self.casinos = []
         self.initialize_casinos()
+
+    def award_banknotes(self):
+        prizes = []
+        for casino in self.casinos:
+            prizes.extend(casino.get_prizes())
+        for prize in prizes:
+            self.get_player(prize.get_dice_owner()).set_prize(prize)
+
+    def declare_winner(self):
+        highest_banknote = 0
+        winner = None
+        for player in self.players:
+            if player.get_prize_amount() > highest_banknote:
+                highest = player.get_prize_amount
+                winner = player
+        print(winner)
+
+    def get_player(self, player_id):
+        for player in self.players:
+            if player.get_id() == player_id:
+                return player
 
     def initialize_banknotes(self):
         self.banknotes = []
@@ -192,16 +249,6 @@ class Game:
                 prizes.append(self.banknotes.pop())
             self.casinos.append(Casino(i+1, prizes))
 
-    def initialize_players(self, call_signs):
-        self.players = []
-        i = 1
-        for call_sign in call_signs:
-            color = self.DICE_COLORS[i-1]
-            self.players.append(Player(call_sign, i, self.initialize_dice_set(color)))
-            self.player_colors[call_sign] = self.DICE_COLORS[i-1]
-            i += 1
-        self.players.sort(key=lambda player: player.age)
-
     @staticmethod
     def initialize_dice_set(color):
         dice = []
@@ -210,19 +257,14 @@ class Game:
             dice.append(Die(faces, color))
         return dice
 
-    def play(self):
-        while not self.is_all_players_dice_depleted():
-            for player in self.players:
-                player.roll_dice()
-                self.place_dice(player)
-        self.award_banknotes()
-        self.declare_winner()
-
-    def place_dice(self, player: Player):
-        if player.dice:
-            dice = player.relinquish_dice(self.casinos)
-            for die in dice:
-                self.casinos[die.top_face-1].dice.append(die)
+    def initialize_players(self, call_signs):
+        self.players = []
+        i = 1
+        for call_sign in call_signs:
+            color = self.DICE_COLORS[i-1]
+            player = Player(call_sign, i, self.initialize_dice_set(color))
+            self.players.append(player)
+            i += 1
 
     def is_all_players_dice_depleted(self) -> bool:
         dice_counts = []
@@ -230,23 +272,20 @@ class Game:
             dice_counts.append(len(player.dice))
         return sum(dice_counts) == 0
 
-    def award_banknotes(self):
-        for casino in self.casinos:
-            print(casino)
-            casino.get_prizes()
+    def place_dice(self, player: Player):
+        if player.dice:
+            dice = player.relinquish_dice(self.casinos)
+            for die in dice:
+                self.casinos[die.top_face-1].dice.append(die)
 
-
-class Die:
-    def __init__(self, faces, color):
-        self.color = color
-        self.faces = faces
-        self.top_face = random.choice(self.faces)
-
-    def roll(self):
-        self.top_face = random.choice(self.faces)
-
-    def __repr__(self):
-        return self.color + ":" + str(self.top_face)
+    def play(self):
+        self.players.sort(key=lambda player: player.age)
+        while not self.is_all_players_dice_depleted():
+            for player in self.players:
+                player.roll_dice()
+                self.place_dice(player)
+        self.award_banknotes()
+        self.declare_winner()
 
 
 class UnknownConfigurationException(Exception):
