@@ -62,6 +62,7 @@ class Die:
 class Experiment:
     ALPHA = "alpha"
     BETA = "beta"
+    EPSILON = "epsilon"
 
     def __init__(self, replicate_cardinality, configuration):
         self.replicate_cardinality = replicate_cardinality
@@ -80,6 +81,9 @@ class Experiment:
         # The BETA experiment: 5 players, all using the ALPHA heuristic.
         elif self.configuration == self.BETA:
             players = [Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA]
+            game = Game(players)
+        elif self.configuration == self.EPSILON:
+            players = [Player.CHARLIE, Player.CHARLIE, Player.CHARLIE, Player.CHARLIE, Player.CHARLIE]
             game = Game(players)
         else:
             raise UnknownConfigurationException()
@@ -172,17 +176,65 @@ class Player:
 
         # Get the higher prize, check each casino.
         higher_prize = 0
-        which_casino = 0
         for casino in casinos:
             if higher_prize < casino.get_banknotes()[0]:
                 higher_prize = casino.get_banknotes()[0]
-                which_casino = casino.call_sign
+
+        which_casinos = []
+        for casino in casinos:
+            if len(casino.get_banknotes()) == higher_prize:
+                which_casinos.append(casino.call_sign)
 
         # Select the dice set depending on the casino with the highest prize
         choice = 0
         for dice_set in dice_sets:
-            if dice_set[0].top_face == which_casino:
-                choice = dice_set
+            for which_casino in which_casinos:
+                if dice_set[0].top_face == which_casino:
+                    choice = dice_set
+        if choice == 0:
+            choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
+        print("Player chose:")
+        print(choice)
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
+        print("Player was left with: ")
+        print(self.dice)
+        print("------------------------------------------------")
+        return choice
+
+    def charlie(self, casinos: List[Casino]):
+        # Group the dice by top face.
+        dice_sets = []
+        for i in range(1, 7):
+            current_set = []
+            for die in self.dice:
+                if die.top_face == i:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+        print("Dice sets: ")
+        print(dice_sets)
+
+        # Get the casino with the most prizes.
+        most_prizes = 0
+        for casino in casinos:
+            if most_prizes < len(casino.get_banknotes()):
+                most_prizes = len(casino.get_banknotes())
+
+        which_casinos = []
+        for casino in casinos:
+            if len(casino.get_banknotes()) == most_prizes:
+                which_casinos.append(casino.call_sign)
+
+        # Select the dice set depending on the casino with the most prizes
+        choice = 0
+        for dice_set in dice_sets:
+            for which_casino in which_casinos:
+                if dice_set[0].top_face == which_casino:
+                    choice = dice_set
         if choice == 0:
             choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
         print("Player chose:")
@@ -223,7 +275,7 @@ class Player:
             return self.bravo(casinos)
         # The CHARLIE heuristic: Choose to bet to the casino with the most prizes.
         elif self.call_sign == self.CHARLIE:
-            return {}
+            return self.charlie(casinos)
         # The DELTA heuristic: Choose to outnumber an opponent. Which opponent? In which casino?
         elif self.call_sign == self.DELTA:
             return {}
