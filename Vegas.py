@@ -5,11 +5,14 @@ from typing import Set
 
 
 class Casino:
-    def __init__(self, call_sign: int, prizes: list):
+    def __init__(self, call_sign: int, banknotes: list):
         self.call_sign = call_sign
         self.dice = []
-        prizes.sort(reverse=True)
-        self.prizes = prizes
+        banknotes.sort(reverse=True)
+        self.banknotes = banknotes
+
+    def get_banknotes(self):
+        return self.banknotes
 
     def get_prizes(self):
         # Group the dice by color.
@@ -24,14 +27,14 @@ class Casino:
         dice_sets.sort(key=len, reverse=True)
         prizes = []
         for dice_set in dice_sets:
-            if self.prizes:
-                prize = Prize(dice_set, self.prizes.pop())
+            if self.banknotes:
+                prize = Prize(dice_set, self.banknotes.pop())
                 prizes.append(prize)
         return prizes
 
     def __repr__(self):
         call_sign = "Casino " + str(self.call_sign) + ":\n"
-        prizes = str(self.prizes) + "\n"
+        prizes = str(self.banknotes) + "\n"
         dice = str(self.dice)
         return call_sign + prizes + dice
 
@@ -154,6 +157,46 @@ class Player:
 
         return choice
 
+    def bravo(self,casinos: List[Casino]):
+        # Group the dice by top face.
+        dice_sets = []
+        for i in range(1, 7):
+            current_set = []
+            for die in self.dice:
+                if die.top_face == i:
+                    current_set.append(die)
+            if current_set:
+                dice_sets.append(current_set)
+        print("Dice sets: ")
+        print(dice_sets)
+
+        # Get the higher prize, check each casino.
+        higher_prize = 0
+        which_casino = 0
+        for casino in casinos:
+            if higher_prize < casino.get_banknotes()[0]:
+                higher_prize = casino.get_banknotes()[0]
+                which_casino = casino.call_sign
+
+        # Select the dice set depending on the casino with the highest prize
+        choice = 0
+        for dice_set in dice_sets:
+            if dice_set[0].top_face == which_casino:
+                choice = dice_set
+        if choice == 0:
+            choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
+        print("Player chose:")
+        print(choice)
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
+        print("Player was left with: ")
+        print(self.dice)
+        print("------------------------------------------------")
+        return choice
+
     def get_id(self):
         return self.id
 
@@ -177,7 +220,7 @@ class Player:
             return self.alpha()
         # The BRAVO heuristic: Choose to bet to the casino with the highest prize.
         elif self.call_sign == self.BRAVO:
-            return {}
+            return self.bravo(casinos)
         # The CHARLIE heuristic: Choose to bet to the casino with the most prizes.
         elif self.call_sign == self.CHARLIE:
             return {}
