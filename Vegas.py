@@ -1,7 +1,7 @@
+import math
 import random
 import uuid
 from typing import List
-from typing import Set
 
 
 class Casino:
@@ -65,15 +65,17 @@ class Experiment:
     EPSILON = "epsilon"
     ZETA = "zeta"
 
-    def __init__(self, replicate_cardinality, configuration):
-        self.replicate_cardinality = replicate_cardinality
+    def __init__(self, replica_cardinality, configuration):
+        self.replica_cardinality = replica_cardinality
         self.configuration = configuration
 
     def execute(self):
-        for i in range(self.replicate_cardinality):
+        results = []
+        for i in range(self.replica_cardinality):
             print("\tThis is replica no. " + str(i) + ".")
             current_game = self.initialize_game()
-            current_game.play()
+            results.append(current_game.play())
+        return results
 
     def initialize_game(self):
         # The ALPHA experiment: 5 players, a different heuristic for each.
@@ -112,9 +114,16 @@ class ExperimentSet:
 
     def execute(self):
         for experiment in self.experiments:
-            print("This is an experiment with configuration " + experiment.configuration + ".")
-            experiment.execute()
+            file = open("experiment_" + experiment.configuration + ".csv", mode='w')
+            file.write("y, alpha, bravo, charlie, delta, echo\n")
+            experiment_manifesto = "This is an experiment with configuration " + experiment.configuration + " and " \
+                                   + str(experiment.replica_cardinality) + " replicas."
+            print(experiment_manifesto)
+            results = experiment.execute()
+            for result in results:
+                file.write(result)
             print("--------------------------------------------------------------------------")
+            file.close()
 
 
 class Prize:
@@ -125,6 +134,9 @@ class Prize:
     def get_dice_owner(self):
         if self.dice:
             return self.dice[0].get_owner_id()
+
+    def __repr__(self):
+        return str(self.banknote) + ". Dice = " + str(self.dice)
 
 
 class Player:
@@ -141,11 +153,11 @@ class Player:
         for die in dice:
             die.set_owner(self.id)
         self.dice = dice
-        self.prize = None
+        self.prizes = []
 
     def __repr__(self):
         return "This is player " + str(self.get_id()) \
-               + ", user of heuristic " + self.call_sign \
+               + ", user of heuristic " + self.call_sign.upper() \
                + " winner of " + str(self.get_prize_amount()) + " dollars."
 
     def get_dices_grouped_by_top_face(self):
@@ -201,7 +213,7 @@ class Player:
 
         return choice
 
-    def bravo(self,casinos: List[Casino]):
+    def bravo(self, casinos: List[Casino]):
         # The BRAVO heuristic: Choose to bet to the casino with the highest prize.
         dice_sets = self.get_dices_grouped_by_top_face()
 
@@ -273,13 +285,13 @@ class Player:
                     number_of_dice_that_can_be_put = len(dice_set)
                     number_of_dice_would_have = number_of_dice_in_casino + number_of_dice_that_can_be_put
                     for opponent in opponents:
-                        if opponent.get_number_of_dice_in_casino() < number_of_dice_would_have:
-                            choices = dice_set
+                        if opponent.get_number_of_dice_in_casino(casino) < number_of_dice_would_have:
+                            choices.append(dice_set)
 
         # Which opponent to outnumber? In which casino?
         # Any opponent in the the casino with the highest prize:
         which_casino = Player.get_call_sign_of_the_casino_with_the_highest_prize(casinos)
-        choice = None
+        choice = []
         for chosen_set in choices:
             if chosen_set[0].top_face == which_casino:
                 choice = chosen_set
@@ -308,13 +320,13 @@ class Player:
                     number_of_dice_that_can_be_put = len(dice_set)
                     number_of_dice_would_have = number_of_dice_in_casino + number_of_dice_that_can_be_put
                     for opponent in opponents:
-                        if opponent.get_number_of_dice_in_casino() == number_of_dice_would_have:
-                            choices = dice_set
+                        if opponent.get_number_of_dice_in_casino(casino) == number_of_dice_would_have:
+                            choices.append(dice_set)
 
         # Which opponent to match? In which casino?
         # Any opponent in the the casino with the highest prize:
         which_casino = Player.get_call_sign_of_the_casino_with_the_highest_prize(casinos)
-        choice = None
+        choice = []
         for chosen_set in choices:
             if chosen_set[0].top_face == which_casino:
                 choice = chosen_set
@@ -335,8 +347,8 @@ class Player:
 
     def get_prize_amount(self):
         amount = 0
-        if self.prize:
-            amount = self.prize.banknote
+        for prize in self.prizes:
+            amount += prize.banknote
         return amount
 
     def roll_dice(self):
@@ -368,19 +380,20 @@ class Player:
             return {}
 
     def set_prize(self, prize: Prize):
-        self.prize = prize
+        self.prizes.append(prize)
 
 
 class Game:
     DICE_COLORS = ["blue", "white", "black", "red", "green"]
 
     def __init__(self, call_signs: list):
-        self.players = set([])  # type: Set[Player]
+        self.players = set([])  # type: List[Player]
         self.initialize_players(call_signs)
         self.banknotes = []
         self.initialize_banknotes()
         self.casinos = []
         self.initialize_casinos()
+        self.winner = None
 
     def award_banknotes(self):
         prizes = []
@@ -390,12 +403,15 @@ class Game:
             self.get_player(prize.get_dice_owner()).set_prize(prize)
 
     def declare_winner(self):
-        highest_banknote = 0
+        highest_amount = 0
         winner = None
         for player in self.players:
-            if player.get_prize_amount() > highest_banknote:
+            if player.get_prize_amount() > highest_amount:
+                highest_amount = player.get_prize_amount()
                 winner = player
+        self.winner = winner
         print("The winner is: " + str(winner))
+        print(winner.prizes)
 
     def get_player(self, player_id):
         for player in self.players:
@@ -405,7 +421,7 @@ class Game:
     def get_player_opponents(self, player):
         opponents = []
         for opponent in self.players:
-            if opponent.get_id() == player.get_id:
+            if opponent.get_id() != player.get_id:
                 opponents.append(opponent)
         return opponents
 
@@ -446,6 +462,7 @@ class Game:
         i = 1
         for call_sign in call_signs:
             color = self.DICE_COLORS[i-1]
+            print(color + ":" + call_sign)
             player = Player(call_sign, i, self.initialize_dice_set(color))
             self.players.append(player)
             i += 1
@@ -463,7 +480,7 @@ class Game:
                 self.casinos[die.top_face-1].dice.append(die)
 
     def play(self):
-        # self.players.sort(key=lambda player: player.age)
+        self.players.sort(key=lambda player: player.age)
         i = 0
         while not self.is_all_players_dice_depleted():
             print("\t\tThis is round " + str(i) + ".")
@@ -475,6 +492,22 @@ class Game:
             i += 1
         self.award_banknotes()
         self.declare_winner()
+        return self.write_row()
+
+    def write_row(self):
+        self.players.sort(key=lambda player: player.call_sign)
+        columns = [Player.ALPHA, Player.BRAVO, Player.CHARLIE, Player.DELTA, Player.ECHO]
+        vector = []
+        for player in self.players:
+            vector.append(player.get_prize_amount())
+        magnitude = math.sqrt(sum(vector[i]*vector[i] for i in range(len(vector))))
+        normalized_vector = [vector[i]/magnitude for i in range(len(vector))]
+        row = self.winner.call_sign + ", "
+        for i in range(0, len(columns)):
+            row += str(normalized_vector[i]) + ", "
+            #row += str(1 if self.players[i] == self.winner else 0) + ", "
+        row = row[:-2]
+        return row + "\n"
 
 
 class UnknownConfigurationException(Exception):
