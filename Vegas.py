@@ -295,6 +295,41 @@ class Player:
 
         return choice
 
+    def echo(self, casinos, opponents):
+        # The ECHO heuristic: Choose to match an opponent.
+        dice_sets = self.get_dices_grouped_by_top_face()
+
+        # Choices in this case is the dice_sets with which I outnumber if someone.
+        choices = []
+        for casino in casinos:
+            for dice_set in dice_sets:
+                if dice_set[0].top_face == casino.call_sign:
+                    number_of_dice_in_casino = self.get_number_of_dice_in_casino(casino)
+                    number_of_dice_that_can_be_put = len(dice_set)
+                    number_of_dice_would_have = number_of_dice_in_casino + number_of_dice_that_can_be_put
+                    for opponent in opponents:
+                        if opponent.get_number_of_dice_in_casino() == number_of_dice_would_have:
+                            choices = dice_set
+
+        # Which opponent to match? In which casino?
+        # Any opponent in the the casino with the highest prize:
+        which_casino = Player.get_call_sign_of_the_casino_with_the_highest_prize(casinos)
+        choice = None
+        for chosen_set in choices:
+            if chosen_set[0].top_face == which_casino:
+                choice = chosen_set
+                break
+
+        # If I can match none (in the the casino with the highest prize), choose at random from my dice sets.
+        if not choices:
+            choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
+        return choice
+
     def get_id(self):
         return self.id
 
@@ -326,6 +361,8 @@ class Player:
         elif self.call_sign == self.DELTA:
             return self.delta(casinos, opponents)
         # The ECHO heuristic: Choose to tie an opponent. Which opponent? In which casino?
+        elif self.call_sign == self.ECHO:
+            return self.echo(casinos, opponents)
         else:
             # Random: Return a random set of dice.
             return {}
