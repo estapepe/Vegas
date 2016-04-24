@@ -33,10 +33,8 @@ class Casino:
         return prizes
 
     def __repr__(self):
-        call_sign = "Casino " + str(self.call_sign) + ":\n"
-        prizes = str(self.banknotes) + "\n"
-        dice = str(self.dice)
-        return call_sign + prizes + dice
+        return "\t\t\tThis is casino " + str(self.call_sign) + " with prizes " + str(self.banknotes) + " :\n\t\t\t\t" \
+               + str(self.dice)
 
 
 class Die:
@@ -62,7 +60,10 @@ class Die:
 class Experiment:
     ALPHA = "alpha"
     BETA = "beta"
+    GAMMA = "gamma"
+    DELTA = "delta"
     EPSILON = "epsilon"
+    ZETA = "zeta"
 
     def __init__(self, replicate_cardinality, configuration):
         self.replicate_cardinality = replicate_cardinality
@@ -70,20 +71,34 @@ class Experiment:
 
     def execute(self):
         for i in range(self.replicate_cardinality):
+            print("\tThis is replica no. " + str(i) + ".")
             current_game = self.initialize_game()
             current_game.play()
 
     def initialize_game(self):
         # The ALPHA experiment: 5 players, a different heuristic for each.
         if self.configuration == self.ALPHA:
-            players = [Player.ALPHA, Player.BRAVO, Player.CHARLIE, Player.DELTA, Player.DELTA]
+            players = [Player.ALPHA, Player.BRAVO, Player.CHARLIE, Player.DELTA, Player.ECHO]
             game = Game(players)
         # The BETA experiment: 5 players, all using the ALPHA heuristic.
         elif self.configuration == self.BETA:
             players = [Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA, Player.ALPHA]
             game = Game(players)
-        elif self.configuration == self.EPSILON:
+        # The GAMMA experiment: 5 players, all using the BRAVO heuristic.
+        elif self.configuration == self.GAMMA:
+            players = [Player.BRAVO, Player.BRAVO, Player.BRAVO, Player.BRAVO, Player.BRAVO]
+            game = Game(players)
+        # The DELTA experiment: 5 players, all using the CHARLIE heuristic.
+        elif self.configuration == self.DELTA:
             players = [Player.CHARLIE, Player.CHARLIE, Player.CHARLIE, Player.CHARLIE, Player.CHARLIE]
+            game = Game(players)
+        # The EPSILON experiment: 5 players, all using the DELTA heuristic.
+        elif self.configuration == self.EPSILON:
+            players = [Player.DELTA, Player.DELTA, Player.DELTA, Player.DELTA, Player.DELTA]
+            game = Game(players)
+        # The ZETA experiment: 5 players, all using the ECHO heuristic.
+        elif self.configuration == self.ZETA:
+            players = [Player.ECHO, Player.ECHO, Player.ECHO, Player.ECHO, Player.ECHO]
             game = Game(players)
         else:
             raise UnknownConfigurationException()
@@ -97,7 +112,9 @@ class ExperimentSet:
 
     def execute(self):
         for experiment in self.experiments:
+            print("This is an experiment with configuration " + experiment.configuration + ".")
             experiment.execute()
+            print("--------------------------------------------------------------------------")
 
 
 class Prize:
@@ -127,10 +144,11 @@ class Player:
         self.prize = None
 
     def __repr__(self):
-        return self.call_sign + " " + str(self.get_id()) + " " + str(self.get_prize_amount())
+        return "This is player " + str(self.get_id()) \
+               + ", user of heuristic " + self.call_sign \
+               + " winner of " + str(self.get_prize_amount()) + " dollars."
 
-    def alpha(self):
-        # Group the dice by top face.
+    def get_dices_grouped_by_top_face(self):
         dice_sets = []
         for i in range(1, 7):
             current_set = []
@@ -139,6 +157,28 @@ class Player:
                     current_set.append(die)
             if current_set:
                 dice_sets.append(current_set)
+        return dice_sets
+
+    @staticmethod
+    def get_call_sign_of_the_casino_with_the_highest_prize(casinos):
+        higher_prize = 0
+        which_casino = 0
+        for casino in casinos:
+            if higher_prize < casino.get_banknotes()[0]:
+                higher_prize = casino.get_banknotes()[0]
+                which_casino = casino.call_sign
+        return which_casino
+
+    def get_number_of_dice_in_casino(self, casino):
+        this_players_dice = []
+        for die in casino.dice:
+            if die.get_owner_id() == self.get_id():
+                this_players_dice.append(die)
+        return len(this_players_dice)
+
+    def alpha(self):
+        # The ALPHA heuristic: Choose to bet the maximum amount of dice (the biggest dice set).
+        dice_sets = self.get_dices_grouped_by_top_face()
 
         # Get the size of the biggest group, there might be two or more groups with the same size.
         biggest_die_set_cardinality = 0
@@ -162,17 +202,8 @@ class Player:
         return choice
 
     def bravo(self,casinos: List[Casino]):
-        # Group the dice by top face.
-        dice_sets = []
-        for i in range(1, 7):
-            current_set = []
-            for die in self.dice:
-                if die.top_face == i:
-                    current_set.append(die)
-            if current_set:
-                dice_sets.append(current_set)
-        print("Dice sets: ")
-        print(dice_sets)
+        # The BRAVO heuristic: Choose to bet to the casino with the highest prize.
+        dice_sets = self.get_dices_grouped_by_top_face()
 
         # Get the higher prize, check each casino.
         higher_prize = 0
@@ -193,30 +224,15 @@ class Player:
                     choice = dice_set
         if choice == 0:
             choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
-        print("Player chose:")
-        print(choice)
 
         # Give up the chosen dice.
         for die in choice:
             self.dice.remove(die)
 
-        print("Player was left with: ")
-        print(self.dice)
-        print("------------------------------------------------")
         return choice
 
     def charlie(self, casinos: List[Casino]):
-        # Group the dice by top face.
-        dice_sets = []
-        for i in range(1, 7):
-            current_set = []
-            for die in self.dice:
-                if die.top_face == i:
-                    current_set.append(die)
-            if current_set:
-                dice_sets.append(current_set)
-        print("Dice sets: ")
-        print(dice_sets)
+        dice_sets = self.get_dices_grouped_by_top_face()
 
         # Get the casino with the most prizes.
         most_prizes = 0
@@ -237,16 +253,46 @@ class Player:
                     choice = dice_set
         if choice == 0:
             choice = dice_sets[random.randint(0, len(dice_sets) - 1)]
-        print("Player chose:")
-        print(choice)
 
         # Give up the chosen dice.
         for die in choice:
             self.dice.remove(die)
 
-        print("Player was left with: ")
-        print(self.dice)
-        print("------------------------------------------------")
+        return choice
+
+    def delta(self, casinos, opponents):
+        # The DELTA heuristic: Choose to outnumber an opponent.
+        dice_sets = self.get_dices_grouped_by_top_face()
+
+        # Choices in this case is the dice_sets with which I outnumber if someone.
+        choices = []
+        for casino in casinos:
+            for dice_set in dice_sets:
+                if dice_set[0].top_face == casino.call_sign:
+                    number_of_dice_in_casino = self.get_number_of_dice_in_casino(casino)
+                    number_of_dice_that_can_be_put = len(dice_set)
+                    number_of_dice_would_have = number_of_dice_in_casino + number_of_dice_that_can_be_put
+                    for opponent in opponents:
+                        if opponent.get_number_of_dice_in_casino() < number_of_dice_would_have:
+                            choices = dice_set
+
+        # Which opponent to outnumber? In which casino?
+        # Any opponent in the the casino with the highest prize:
+        which_casino = Player.get_call_sign_of_the_casino_with_the_highest_prize(casinos)
+        choice = None
+        for chosen_set in choices:
+            if chosen_set[0].top_face == which_casino:
+                choice = chosen_set
+                break
+
+        # If I can outnumber none (in the the casino with the highest prize), choose at random from my dice sets.
+        if not choices:
+            choice = dice_sets[random.randint(0, len(dice_sets)-1)]
+
+        # Give up the chosen dice.
+        for die in choice:
+            self.dice.remove(die)
+
         return choice
 
     def get_id(self):
@@ -262,7 +308,7 @@ class Player:
         for die in self.dice:
             die.roll()
 
-    def relinquish_dice(self, casinos):
+    def relinquish_dice(self, casinos, opponents):
         # Player has no dice.
         if not self.dice:
             return {}
@@ -278,7 +324,7 @@ class Player:
             return self.charlie(casinos)
         # The DELTA heuristic: Choose to outnumber an opponent. Which opponent? In which casino?
         elif self.call_sign == self.DELTA:
-            return {}
+            return self.delta(casinos, opponents)
         # The ECHO heuristic: Choose to tie an opponent. Which opponent? In which casino?
         else:
             # Random: Return a random set of dice.
@@ -311,14 +357,20 @@ class Game:
         winner = None
         for player in self.players:
             if player.get_prize_amount() > highest_banknote:
-                highest = player.get_prize_amount
                 winner = player
-        print(winner)
+        print("The winner is: " + str(winner))
 
     def get_player(self, player_id):
         for player in self.players:
             if player.get_id() == player_id:
                 return player
+
+    def get_player_opponents(self, player):
+        opponents = []
+        for opponent in self.players:
+            if opponent.get_id() == player.get_id:
+                opponents.append(opponent)
+        return opponents
 
     def initialize_banknotes(self):
         self.banknotes = []
@@ -339,10 +391,10 @@ class Game:
     def initialize_casinos(self):
         self.casinos = []
         for i in range(6):
-            prizes = []
-            while sum(prizes) < 50000:
-                prizes.append(self.banknotes.pop())
-            self.casinos.append(Casino(i+1, prizes))
+            banknotes = []
+            while sum(banknotes) < 50000:
+                banknotes.append(self.banknotes.pop())
+            self.casinos.append(Casino(i+1, banknotes))
 
     @staticmethod
     def initialize_dice_set(color):
@@ -369,16 +421,21 @@ class Game:
 
     def place_dice(self, player: Player):
         if player.dice:
-            dice = player.relinquish_dice(self.casinos)
+            dice = player.relinquish_dice(self.casinos, self.get_player_opponents(player))
             for die in dice:
                 self.casinos[die.top_face-1].dice.append(die)
 
     def play(self):
-        self.players.sort(key=lambda player: player.age)
+        # self.players.sort(key=lambda player: player.age)
+        i = 0
         while not self.is_all_players_dice_depleted():
+            print("\t\tThis is round " + str(i) + ".")
             for player in self.players:
                 player.roll_dice()
                 self.place_dice(player)
+            for casino in self.casinos:
+                print(casino)
+            i += 1
         self.award_banknotes()
         self.declare_winner()
 
