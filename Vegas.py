@@ -115,7 +115,7 @@ class ExperimentSet:
     def execute(self):
         for experiment in self.experiments:
             file = open("experiment_" + experiment.configuration + ".csv", mode='w')
-            file.write("y, alpha, bravo, charlie, delta, echo\n")
+            file.write("alpha, bravo, charlie, delta, echo\n")
             experiment_manifesto = "This is an experiment with configuration " + experiment.configuration + " and " \
                                    + str(experiment.replica_cardinality) + " replicas."
             print(experiment_manifesto)
@@ -500,12 +500,12 @@ class Game:
         vector = []
         for player in self.players:
             vector.append(player.get_prize_amount())
-        magnitude = math.sqrt(sum(vector[i]*vector[i] for i in range(len(vector))))
+        magnitude = sum(vector[i] for i in range(len(vector)))
         normalized_vector = [vector[i]/magnitude for i in range(len(vector))]
-        row = self.winner.call_sign + ", "
+        row = "" # self.winner.call_sign + ", "
         for i in range(0, len(columns)):
             row += str(normalized_vector[i]) + ", "
-            #row += str(1 if self.players[i] == self.winner else 0) + ", "
+            # row += str(1 if self.players[i] == self.winner else 0) + ", "
         row = row[:-2]
         return row + "\n"
 
